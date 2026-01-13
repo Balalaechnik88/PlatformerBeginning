@@ -1,0 +1,52 @@
+using UnityEngine;
+
+public class MedkitSpawner : MonoBehaviour
+{
+    [SerializeField] private Medkit _medkitPrefab;
+    [SerializeField] private Transform[] _spawnPoints;
+
+    [SerializeField] private int _minCount = 3;
+    [SerializeField] private int _maxCount = 7;
+
+    private void Start()
+    {
+        SpawnRandom();
+    }
+
+    private void SpawnRandom()
+    {
+        if (_medkitPrefab == null || _spawnPoints == null || _spawnPoints.Length == 0)
+            return;
+
+        int count = Random.Range(_minCount, _maxCount + 1);
+        count = Mathf.Min(count, _spawnPoints.Length);
+
+        int[] indices = CreateShuffledIndices(_spawnPoints.Length);
+
+        for (int i = 0; i < count; i++)
+        {
+            Transform point = _spawnPoints[indices[i]];
+
+            if (point == null)
+                continue;
+
+            Instantiate(_medkitPrefab, point.position, Quaternion.identity);
+        }
+    }
+
+    private int[] CreateShuffledIndices(int length)
+    {
+        int[] indices = new int[length];
+
+        for (int i = 0; i < length; i++)
+            indices[i] = i;
+
+        for (int i = 0; i < length; i++)
+        {
+            int swapIndex = Random.Range(i, length);
+            (indices[i], indices[swapIndex]) = (indices[swapIndex], indices[i]);
+        }
+
+        return indices;
+    }
+}
