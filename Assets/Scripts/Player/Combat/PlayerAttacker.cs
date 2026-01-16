@@ -10,40 +10,52 @@ public class PlayerAttacker : MonoBehaviour
     private void Awake()
     {
         if (_input == null)
-            Debug.LogError($"[{nameof(PlayerAttacker)}] InputReader2D не назначен.", this);
+            Debug.LogError($"[{nameof(PlayerAttacker)}] InputReader не назначен.", this);
         if (_attack == null)
-            Debug.LogError($"[{nameof(PlayerAttacker)}] MeleeAttack2D не назначен.", this);
+            Debug.LogError($"[{nameof(PlayerAttacker)}] MeleeAttack не назначен.", this);
         if (_animator == null)
             Debug.LogError($"[{nameof(PlayerAttacker)}] PlayerAnimator не назначен.", this);
         if (_eventReceiver == null)
             Debug.LogError($"[{nameof(PlayerAttacker)}] PlayerAnimationEventReceiver не назначен.", this);
+    }
+
+    private void OnEnable()
+    {
+        if (_eventReceiver == null)
+            return;
 
         _eventReceiver.HitEvent += OnHitEvent;
         _eventReceiver.AttackFinishedEvent += OnAttackFinishedEvent;
     }
 
-    private void Update()
+    private void OnDisable()
     {
-        bool isAttackPressed = _input.ConsumeAttackPressed();
-
-        if (isAttackPressed == false)
+        if (_eventReceiver == null)
             return;
 
-        bool didStartAttack = _attack.TryStartAttack();
+        _eventReceiver.HitEvent -= OnHitEvent;
+        _eventReceiver.AttackFinishedEvent -= OnAttackFinishedEvent;
+    }
 
-        if (didStartAttack)
-        {
+    private void Update()
+    {
+        if (_input == null || _attack == null || _animator == null)
+            return;
+
+        if (_input.ConsumeAttackPressed() == false)
+            return;
+
+        if (_attack.TryStartAttack())
             _animator.TriggerAttack();
-        }
     }
 
     private void OnHitEvent()
     {
-        _attack.Hit();
+        _attack?.Hit();
     }
 
     private void OnAttackFinishedEvent()
     {
-        _attack.AttackFinished();
+        _attack?.AttackFinished();
     }
 }

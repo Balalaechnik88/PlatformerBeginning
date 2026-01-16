@@ -18,33 +18,42 @@ public class MedkitSpawner : MonoBehaviour
         if (_medkitPrefab == null || _spawnPoints == null || _spawnPoints.Length == 0)
             return;
 
-        int count = Random.Range(_minCount, _maxCount + 1);
-        count = Mathf.Min(count, _spawnPoints.Length);
+        int spawnCount = Random.Range(_minCount, _maxCount + 1);
+        spawnCount = Mathf.Min(spawnCount, _spawnPoints.Length);
 
-        int[] indices = CreateShuffledIndices(_spawnPoints.Length);
+        int[] shuffledIndices = CreateShuffledIndices(_spawnPoints.Length);
 
-        for (int i = 0; i < count; i++)
+        for (int spawnIndex = 0; spawnIndex < spawnCount; spawnIndex++)
         {
-            Transform point = _spawnPoints[indices[i]];
+            Transform spawnPoint = _spawnPoints[shuffledIndices[spawnIndex]];
 
-            if (point == null)
+            if (spawnPoint == null)
                 continue;
 
-            Instantiate(_medkitPrefab, point.position, Quaternion.identity);
+            Medkit spawnedMedkit = Instantiate(_medkitPrefab, spawnPoint.position, Quaternion.identity);
+            spawnedMedkit.Collected += OnCollectableCollected;
         }
+    }
+
+    private void OnCollectableCollected(ICollectable collectable)
+    {
+        collectable.Collected -= OnCollectableCollected;
+
+        if (collectable is MonoBehaviour collectableBehaviour)
+            Destroy(collectableBehaviour.gameObject);
     }
 
     private int[] CreateShuffledIndices(int length)
     {
         int[] indices = new int[length];
 
-        for (int i = 0; i < length; i++)
-            indices[i] = i;
+        for (int index = 0; index < length; index++)
+            indices[index] = index;
 
-        for (int i = 0; i < length; i++)
+        for (int index = 0; index < length; index++)
         {
-            int swapIndex = Random.Range(i, length);
-            (indices[i], indices[swapIndex]) = (indices[swapIndex], indices[i]);
+            int swapIndex = Random.Range(index, length);
+            (indices[index], indices[swapIndex]) = (indices[swapIndex], indices[index]);
         }
 
         return indices;

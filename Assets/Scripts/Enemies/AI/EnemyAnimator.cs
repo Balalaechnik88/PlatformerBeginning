@@ -10,8 +10,8 @@ public class EnemyAnimator : MonoBehaviour
     private int _speedId;
     private int _attackId;
 
-    private bool _hasSpeed;
-    private bool _hasAttack;
+    private bool _hasSpeedParameter;
+    private bool _hasAttackTrigger;
 
     private void Awake()
     {
@@ -21,36 +21,36 @@ public class EnemyAnimator : MonoBehaviour
         _speedId = Animator.StringToHash(SpeedParameterName);
         _attackId = Animator.StringToHash(AttackTriggerName);
 
-        _hasSpeed = HasParameter(_animator, _speedId);
-        _hasAttack = HasParameter(_animator, _attackId);
-    }
-
-    public void SetSpeed(float speed)
-    {
-        if (_animator == null || _hasSpeed == false)
-            return;
-
-        _animator.SetFloat(_speedId, speed);
+        _hasSpeedParameter = HasParameter(_animator, _speedId);
+        _hasAttackTrigger = HasParameter(_animator, _attackId);
     }
 
     public void PlayAttack()
     {
-        if (_animator == null || _hasAttack == false)
+        if (_animator == null || _hasAttackTrigger == false)
             return;
 
         _animator.SetTrigger(_attackId);
     }
 
-    private static bool HasParameter(Animator animator, int id)
+    public void SetSpeed(float speed)
+    {
+        if (_animator == null || _hasSpeedParameter == false)
+            return;
+
+        _animator.SetFloat(_speedId, speed);
+    }
+
+    private static bool HasParameter(Animator animator, int parameterId)
     {
         if (animator == null)
             return false;
 
-        var parameters = animator.parameters;
+        AnimatorControllerParameter[] parameters = animator.parameters;
 
-        for (int i = 0; i < parameters.Length; i++)
+        for (int index = 0; index < parameters.Length; index++)
         {
-            if (parameters[i].nameHash == id)
+            if (parameters[index].nameHash == parameterId)
                 return true;
         }
 

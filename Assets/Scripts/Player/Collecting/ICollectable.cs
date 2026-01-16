@@ -1,7 +1,8 @@
-using UnityEngine;
+using System;
 
 public interface ICollectable
 {
-    bool CanBeCollected(GameObject collector);
-    void Collect(GameObject collector);
+    event Action<ICollectable> Collected;
+
+    void RaiseCollected();
 }

@@ -3,26 +3,13 @@ using UnityEngine;
 
 public class PlayerCollector : MonoBehaviour
 {
-    public event Action<int> CoinsChanged;
-
-    public int Coins { get; private set; }
+    public event Action<ICollectable> CollectableDetected;
 
     private void OnTriggerEnter2D(Collider2D other)
     {
-        ICollectable collectable = other.GetComponent<ICollectable>();
-
-        if (collectable == null)
+        if (other.TryGetComponent(out ICollectable collectable) == false)
             return;
 
-        if (collectable.CanBeCollected(gameObject) == false)
-            return;
-
-        collectable.Collect(gameObject);
-    }
-
-    public void AddCoins(int amount)
-    {
-        Coins += amount;
-        CoinsChanged?.Invoke(Coins);
+        CollectableDetected?.Invoke(collectable);
     }
 }

@@ -1,7 +1,10 @@
+using System;
 using UnityEngine;
 
 public class EnemyBrain : MonoBehaviour
 {
+    private const float MinDistanceEpsilon = 0.0001f;
+
     [Header("References")]
     [SerializeField] private PlayerDetector _detector;
     [SerializeField] private WaypointPatroller _patroller;
@@ -14,109 +17,147 @@ public class EnemyBrain : MonoBehaviour
     [Header("Attack")]
     [SerializeField] private float _attackStartDistance = 2f;
 
-    private const float MinDistanceEpsilon = 0.0001f;
-
     private Transform _currentTarget;
     private bool _isAttacking;
+    private float _attackStartDistanceSquared;
+    private IEnemyStrategy _patrolStrategy;
 
-    private float _attackStartDistanceSqr;
+    public event Action AttackStarted;
 
-    public bool IsAttacking => _isAttacking; 
+    public bool IsAttacking => _isAttacking;
 
     private void Awake()
     {
-        _attackStartDistanceSqr = _attackStartDistance * _attackStartDistance;
+        _attackStartDistanceSquared = _attackStartDistance * _attackStartDistance;
 
-        if (_detector == null) 
-            Debug.LogError($"[{nameof(EnemyBrain)}] Не назначен PlayerDetector2D.", this);
+        if (_detector == null)
+            Debug.LogError($"[{nameof(EnemyBrain)}] Не назначен PlayerDetector.", this);
         if (_patroller == null)
-            Debug.LogError($"[{nameof(EnemyBrain)}] Не назначен WaypointPatroller2D.", this);
-        if (_chaser == null) 
-            Debug.LogError($"[{nameof(EnemyBrain)}] Не назначен TargetChaser2D.", this);
+            Debug.LogError($"[{nameof(EnemyBrain)}] Не назначен WaypointPatroller.", this);
+        if (_chaser == null)
+            Debug.LogError($"[{nameof(EnemyBrain)}] Не назначен TargetChaser.", this);
         if (_attack == null)
-            Debug.LogError($"[{nameof(EnemyBrain)}] Не назначен MeleeAttack2D.", this);
+            Debug.LogError($"[{nameof(EnemyBrain)}] Не назначен MeleeAttack.", this);
         if (_rotator == null)
-            Debug.LogError($"[{nameof(EnemyBrain)}] Не назначен SpriteDirectionRotator2D.", this);
-        if (_animator == null) 
+            Debug.LogError($"[{nameof(EnemyBrain)}] Не назначен SpriteDirectionRotator.", this);
+        if (_animator == null)
             Debug.LogError($"[{nameof(EnemyBrain)}] Не назначен EnemyAnimator.", this);
         if (_eventReceiver == null)
             Debug.LogError($"[{nameof(EnemyBrain)}] Не назначен EnemyAnimationEventReceiver.", this);
 
-        if (_eventReceiver != null)
-        {
-            _eventReceiver.HitEvent += OnHitEvent;
-            _eventReceiver.AttackFinishedEvent += OnAttackFinishedEvent;
-        }
+        if (_patroller != null && _chaser != null)
+            _patrolStrategy = new EnemyPatrolStrategy(_patroller, _chaser);
     }
 
-    private void OnDestroy()
+    private void OnEnable()
     {
-        if (_eventReceiver != null)
-        {
-            _eventReceiver.HitEvent -= OnHitEvent;
-            _eventReceiver.AttackFinishedEvent -= OnAttackFinishedEvent;
-        }
-    }
-
-    private void Update()
-    {
-        if (_detector == null)
+        if (_eventReceiver == null)
             return;
 
-        _currentTarget = _detector.DetectedPlayer;
+        _eventReceiver.HitEvent += OnHitEvent;
+        _eventReceiver.AttackFinishedEvent += OnAttackFinishedEvent;
+    }
 
-        
+    private void OnDisable()
+    {
+        if (_eventReceiver == null)
+            return;
+
+        _eventReceiver.HitEvent -= OnHitEvent;
+        _eventReceiver.AttackFinishedEvent -= OnAttackFinishedEvent;
+    }
+
+    private void FixedUpdate()
+    {
+        UpdateTarget();
+        TryStartAttackIfInRange();
+        TickMovementAndAnimation();
+    }
+
+    private void UpdateTarget()
+    {
+        if (_detector == null)
+        {
+            _currentTarget = null;
+            return;
+        }
+
+        _currentTarget = _detector.FindPlayer();
+    }
+
+    private void TryStartAttackIfInRange()
+    {
         if (_isAttacking)
             return;
 
         if (_currentTarget == null || _attack == null)
             return;
 
-        Vector2 toTarget = (Vector2)_currentTarget.position - (Vector2)transform.position;
-        float distanceToTargetSqr = toTarget.sqrMagnitude;
+        Vector2 vectorToTarget = (Vector2)_currentTarget.position - (Vector2)transform.position;
+        float distanceToTargetSquared = vectorToTarget.sqrMagnitude;
 
-        if (distanceToTargetSqr < MinDistanceEpsilon)
+        if (distanceToTargetSquared < MinDistanceEpsilon)
             return;
 
-        if (distanceToTargetSqr <= _attackStartDistanceSqr)
-        {
-            bool didStartAttack = _attack.TryStartAttack();
+        if (distanceToTargetSquared > _attackStartDistanceSquared)
+            return;
 
-            if (didStartAttack)
-            {
-                _isAttacking = true;
-                _animator?.PlayAttack();
-            }
+        if (_attack.TryStartAttack())
+        {
+            _isAttacking = true;
+            _animator?.PlayAttack();
+            AttackStarted?.Invoke();
         }
     }
 
-    private void FixedUpdate()
+    private void TickMovementAndAnimation()
     {
         if (_isAttacking)
         {
-            _patroller?.Stop();
-            _chaser?.Stop();
-            _animator?.SetSpeed(0f);
+            StopMovement();
+            ApplyFacingAndSpeed(0f);
             return;
         }
 
         if (_currentTarget == null)
         {
-            _chaser?.Stop();
-            _patroller?.TickPatrol();
-
-            float patrolSpeedX = _patroller != null ? _patroller.CurrentSpeedX : 0f;
-            _rotator?.SetFacingDirection(patrolSpeedX);
-            _animator?.SetSpeed(Mathf.Abs(patrolSpeedX));
+            TickPatrol();
             return;
         }
 
+        TickChase(_currentTarget);
+    }
+
+    private void TickPatrol()
+    {
+        if (_patrolStrategy == null)
+            return;
+
+        _patrolStrategy.Tick();
+
+        float patrolSpeedX = _patroller != null ? _patroller.CurrentSpeedX : 0f;
+        ApplyFacingAndSpeed(patrolSpeedX);
+    }
+
+    private void TickChase(Transform target)
+    {
         _patroller?.Stop();
-        _chaser?.TickChase(_currentTarget);
+        _chaser?.TickChase(target);
 
         float chaseSpeedX = _chaser != null ? _chaser.CurrentSpeedX : 0f;
-        _rotator?.SetFacingDirection(chaseSpeedX);
-        _animator?.SetSpeed(Mathf.Abs(chaseSpeedX));
+        ApplyFacingAndSpeed(chaseSpeedX);
+    }
+
+    private void StopMovement()
+    {
+        _patroller?.Stop();
+        _chaser?.Stop();
+    }
+
+    private void ApplyFacingAndSpeed(float speedX)
+    {
+        _rotator?.SetFacingDirection(speedX);
+        _animator?.SetSpeed(Mathf.Abs(speedX));
     }
 
     private void OnHitEvent()

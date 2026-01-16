@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 public class MeleeAttack : MonoBehaviour
@@ -14,81 +15,60 @@ public class MeleeAttack : MonoBehaviour
     [Header("Target Selection")]
     [SerializeField] private float _minTargetDistance = 0.01f;
 
-    private float _cooldownRemainingSeconds;
-    private bool _isAttacking;
-
     public bool IsAttacking => _isAttacking;
-    public bool CanStartAttack => _isAttacking == false && _cooldownRemainingSeconds <= 0f;
-    public float AttackRadius => _attackRadius;
+    public bool CanStartAttack => _isAttacking == false && _isOnCooldown == false;
 
-    private void Update()
+    private bool _isAttacking;
+    private bool _isOnCooldown;
+    private Coroutine _cooldownRoutine;
+
+    public void AttackFinished()
     {
-        UpdateCooldownTimer();
-    }
+        if (_isAttacking == false)
+            return;
 
-    public bool TryStartAttack()
-    {
-        if (CanStartAttack == false)
-        {
-            return false;
-        }
+        _isAttacking = false;
 
-        _isAttacking = true;
-        return true;
+        if (_cooldownRoutine != null)
+            StopCoroutine(_cooldownRoutine);
+
+        _cooldownRoutine = StartCoroutine(CooldownRoutine());
     }
 
     public void Hit()
     {
         if (_isAttacking == false)
-        {
             return;
-        }
 
         Vector2 attackOrigin = GetAttackOrigin();
         Health nearestTargetHealth = FindNearestTargetHealth(attackOrigin);
 
         if (nearestTargetHealth == null)
-        {
             return;
-        }
 
         nearestTargetHealth.TakeDamage(_damage);
     }
 
-    public void AttackFinished()
+    public bool TryStartAttack()
     {
-        if (_isAttacking == false)
-        {
-            return;
-        }
+        if (CanStartAttack == false)
+            return false;
 
-        _isAttacking = false;
-        _cooldownRemainingSeconds = _cooldownSeconds;
+        _isAttacking = true;
+        return true;
     }
 
-    private void UpdateCooldownTimer()
+    private IEnumerator CooldownRoutine()
     {
-        if (_cooldownRemainingSeconds <= 0f)
-        {
-            return;
-        }
-
-        _cooldownRemainingSeconds -= Time.deltaTime;
-
-        if (_cooldownRemainingSeconds < 0f)
-        {
-            _cooldownRemainingSeconds = 0f;
-        }
+        _isOnCooldown = true;
+        yield return new WaitForSeconds(_cooldownSeconds);
+        _isOnCooldown = false;
+        _cooldownRoutine = null;
     }
 
     private Vector2 GetAttackOrigin()
     {
-        if (_attackPoint != null)
-        {
-            return _attackPoint.position;
-        }
-
-        return transform.position;
+        return _attackPoint != null ? _attackPoint.position : transform.position;
     }
 
     private Health FindNearestTargetHealth(Vector2 attackOrigin)
@@ -96,50 +76,47 @@ public class MeleeAttack : MonoBehaviour
         Collider2D[] hitColliders = Physics2D.OverlapCircleAll(attackOrigin, _attackRadius, _targetLayerMask);
 
         if (hitColliders == null || hitColliders.Length == 0)
-        {
             return null;
-        }
-
-        Health nearestHealth = null;
 
         float minTargetDistanceSquared = _minTargetDistance * _minTargetDistance;
+
+        Health nearestHealth = null;
         float nearestDistanceSquared = float.MaxValue;
 
-        for (int i = 0; i < hitColliders.Length; i++)
+        for (int colliderIndex = 0; colliderIndex < hitColliders.Length; colliderIndex++)
         {
-            Collider2D hitCollider = hitColliders[i];
+            Collider2D hitCollider = hitColliders[colliderIndex];
 
             if (hitCollider == null)
-            {
                 continue;
-            }
 
-            Health targetHealth =
-                hitCollider.GetComponent<Health>() ??
-                hitCollider.GetComponentInParent<Health>() ??
-                hitCollider.GetComponentInChildren<Health>();
+            Health targetHealth = FindHealthOnColliderOrParent(hitCollider);
 
             if (targetHealth == null)
-            {
                 continue;
-            }
 
             Vector2 deltaToTarget = (Vector2)targetHealth.transform.position - attackOrigin;
-            float distanceToTargetSquared = deltaToTarget.sqrMagnitude;
+            float distanceSquared = deltaToTarget.sqrMagnitude;
 
-            if (distanceToTargetSquared < minTargetDistanceSquared)
-            {
+            if (distanceSquared < minTargetDistanceSquared)
                 continue;
-            }
 
-            if (distanceToTargetSquared < nearestDistanceSquared)
+            if (distanceSquared < nearestDistanceSquared)
             {
-                nearestDistanceSquared = distanceToTargetSquared;
+                nearestDistanceSquared = distanceSquared;
                 nearestHealth = targetHealth;
             }
         }
 
         return nearestHealth;
+    }
+
+    private static Health FindHealthOnColliderOrParent(Collider2D hitCollider)
+    {
+        if (hitCollider.TryGetComponent(out Health health))
+            return health;
+
+        return hitCollider.GetComponentInParent<Health>();
     }
 
     private void OnDrawGizmosSelected()

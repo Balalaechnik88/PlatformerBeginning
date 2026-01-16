@@ -1,20 +1,16 @@
+using System;
 using UnityEngine;
 
 public class Coin : MonoBehaviour, ICollectable
 {
     [SerializeField] private int _value = 1;
 
-    public bool CanBeCollected(GameObject collector) => true;
+    public event Action<ICollectable> Collected;
 
-    public void Collect(GameObject collector)
+    public int Value => _value;
+
+    public void RaiseCollected()
     {
-        PlayerCollector collector2D = collector.GetComponent<PlayerCollector>();
-
-        if (collector2D != null)
-        {
-            collector2D.AddCoins(_value);
-        }
-
-        Destroy(gameObject);
+        Collected?.Invoke(this);
     }
 }

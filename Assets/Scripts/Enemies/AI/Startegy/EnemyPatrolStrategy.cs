@@ -1,5 +1,3 @@
-using UnityEngine;
-
 public class EnemyPatrolStrategy : IEnemyStrategy
 {
     private readonly WaypointPatroller _patroller;

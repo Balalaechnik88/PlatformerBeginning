@@ -15,14 +15,22 @@ public class CoinSpawner : MonoBehaviour
         if (_coinPrefab == null || _spawnPoints == null)
             return;
 
-        for (int i = 0; i < _spawnPoints.Length; i++)
+        for (int spawnPointIndex = 0; spawnPointIndex < _spawnPoints.Length; spawnPointIndex++)
         {
-            Transform point = _spawnPoints[i];
-
-            if (point == null)
+            Transform spawnPoint = _spawnPoints[spawnPointIndex];
+            if (spawnPoint == null)
                 continue;
 
-            Instantiate(_coinPrefab, point.position, Quaternion.identity);
+            Coin spawnedCoin = Instantiate(_coinPrefab, spawnPoint.position, Quaternion.identity);
+            spawnedCoin.Collected += OnCollectableCollected;
         }
+    }
+
+    private void OnCollectableCollected(ICollectable collectable)
+    {
+        collectable.Collected -= OnCollectableCollected;
+
+        if (collectable is MonoBehaviour collectableBehaviour)
+            Destroy(collectableBehaviour.gameObject);
     }
 }

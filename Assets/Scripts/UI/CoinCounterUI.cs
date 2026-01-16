@@ -1,46 +1,36 @@
-using UnityEngine;
 using TMPro;
+using UnityEngine;
 
 public class CoinCounterUI : MonoBehaviour
 {
     [Header("References")]
-    [SerializeField] private PlayerCollector _playerCollector;
+    [SerializeField] private PlayerWallet _wallet;
     [SerializeField] private TMP_Text _coinsText;
 
     private void Awake()
     {
-        if (_playerCollector == null)
+        if (_wallet == null)
         {
-            Debug.LogError(
-                $"[{nameof(CoinCounterUI)}] Не назначен PlayerCollector2D.",
-                this);
+            Debug.LogError($"[{nameof(CoinCounterUI)}] Не назначен PlayerWallet.", this);
             return;
         }
 
         if (_coinsText == null)
         {
-            Debug.LogError(
-                $"[{nameof(CoinCounterUI)}] Не назначен TMP_Text.",
-                this);
+            Debug.LogError($"[{nameof(CoinCounterUI)}] Не назначен TMP_Text.", this);
             return;
         }
     }
 
     private void OnEnable()
     {
-        if (_playerCollector != null)
-        {
-            _playerCollector.CoinsChanged += UpdateCoinsText;
-            UpdateCoinsText(_playerCollector.Coins);
-        }
+        _wallet.CoinsChanged += UpdateCoinsText;
+        UpdateCoinsText(_wallet.Coins);
     }
 
     private void OnDisable()
     {
-        if (_playerCollector != null)
-        {
-            _playerCollector.CoinsChanged -= UpdateCoinsText;
-        }
+        _wallet.CoinsChanged -= UpdateCoinsText;
     }
 
     private void UpdateCoinsText(int coins)
